@@ -1,0 +1,214 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel-terrain-booking
+  labels:
+    app: laravel-terrain-booking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: laravel-terrain-booking
+  template:
+    metadata:
+      labels:
+        app: laravel-terrain-booking
+    spec:
+      containers:
+      # Web Server Container
+      - name: web-server
+        image: php:8.2-fpm-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 22
+          name: ssh
+        env:
+        - name: DB_HOST
+          value: "localhost"
+        - name: DB_DATABASE
+          value: "kunsithya-db"
+        - name: DB_USERNAME
+          value: "root"
+        - name: DB_PASSWORD
+          value: "Hello@123"
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          # Install system dependencies
+          apk update && apk add --no-cache \
+            nginx \
+            openssh-server \
+            git \
+            curl \
+            libpng-dev \
+            libjpeg-turbo-dev \
+            freetype-dev \
+            zip \
+            unzip \
+            mysql-client \
+            supervisor
+          
+          # Install PHP extensions
+          docker-php-ext-configure gd --with-freetype --with-jpeg
+          docker-php-ext-install \
+            pdo \
+            pdo_mysql \
+            mysqli \
+            gd \
+            zip \
+            bcmath \
+            mbstring \
+            xml \
+            curl \
+            intl
+          
+          # Install Composer
+          curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          
+          # Setup SSH
+          ssh-keygen -A
+          echo 'root:Hello@123' | chpasswd
+          sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          
+          # Setup Nginx
+          mkdir -p /var/www/html
+          
+          # Clone Laravel project (if not already present)
+          if [ ! -d "/var/www/html/terrain-booking-system" ]; then
+            cd /var/www/html
+            git clone https://github.com/Sithya/terrain-booking-system.git
+            cd terrain-booking-system
+            composer install --no-dev --optimize-autoloader
+            chown -R www-data:www-data /var/www/html/terrain-booking-system
+            chmod -R 755 /var/www/html/terrain-booking-system/storage
+            chmod -R 755 /var/www/html/terrain-booking-system/bootstrap/cache
+          fi
+          
+          # Configure Nginx
+          cat > /etc/nginx/http.d/default.conf << 'NGINX_EOF'
+          server {
+              listen 8080;
+              root /var/www/html/terrain-booking-system/public;
+              index index.php index.html;
+              
+              location / {
+                  try_files $uri $uri/ /index.php?$query_string;
+              }
+              
+              location ~ \.php$ {
+                  fastcgi_pass 127.0.0.1:9000;
+                  fastcgi_index index.php;
+                  fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+                  include fastcgi_params;
+              }
+          }
+          NGINX_EOF
+          
+          # Setup Supervisor
+          cat > /etc/supervisor/conf.d/supervisord.conf << 'SUPERVISOR_EOF'
+          [supervisord]
+          nodaemon=true
+          user=root
+          
+          [program:php-fpm]
+          command=php-fpm8.2 -F
+          autostart=true
+          autorestart=true
+          
+          [program:nginx]
+          command=nginx -g "daemon off;"
+          autostart=true
+          autorestart=true
+          
+          [program:sshd]
+          command=/usr/sbin/sshd -D
+          autostart=true
+          autorestart=true
+          SUPERVISOR_EOF
+          
+          # Start services
+          supervisord -c /etc/supervisor/conf.d/supervisord.conf
+        volumeMounts:
+        - name: web-storage
+          mountPath: /var/www/html
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      
+      # MySQL Database Container
+      - name: mysql-database
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+          name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "Hello@123"
+        - name: MYSQL_DATABASE
+          value: "kunsithya-db"
+        - name: MYSQL_USER
+          value: "laravel"
+        - name: MYSQL_PASSWORD
+          value: "Hello@123"
+        args:
+        - --default-authentication-plugin=mysql_native_password
+        - --character-set-server=utf8mb4
+        - --collation-server=utf8mb4_unicode_ci
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - "mysql -h localhost -u root -p$MYSQL_ROOT_PASSWORD -e 'SELECT 1'"
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+      
+      volumes:
+      - name: web-storage
+        emptyDir: {}
+      - name: mysql-storage
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: laravel-terrain-booking-service
+spec:
+  selector:
+    app: laravel-terrain-booking
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: ssh
+    port: 22
+    targetPort: 22
+    protocol: TCP
+  - name: mysql
+    port: 3306
+    targetPort: 3306
+    protocol: TCP
+  type: LoadBalancer
