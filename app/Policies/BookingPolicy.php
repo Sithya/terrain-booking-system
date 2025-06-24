@@ -3,64 +3,77 @@
 namespace App\Policies;
 
 use App\Models\Booking;
+use App\Models\Terrain;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class BookingPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
     public function viewAny(User $user): bool
     {
-        return false;
+        return true;
     }
 
-    /**
-     * Determine whether the user can view the model.
-     */
     public function view(User $user, Booking $booking): bool
     {
-        return false;
+        return $user->id === $booking->renter_id ||
+               $user->id === $booking->terrain->owner_id;
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
-    public function create(User $user): bool
+    public function create(User $user, Terrain $terrain = null): bool
     {
-        return false;
+        // User cannot book their own terrain
+        if ($terrain && $user->id === $terrain->owner_id) {
+            return false;
+        }
+
+        return true;
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, Booking $booking): bool
     {
-        return false;
+        // Renter can update if booking is pending
+        if ($user->id === $booking->renter_id && $booking->status === 'pending') {
+            return true;
+        }
+
+        // Owner can always update status
+        return $user->id === $booking->terrain->owner_id;
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, Booking $booking): bool
     {
-        return false;
+        // Can cancel if it's pending or approved (not yet completed)
+        return ($user->id === $booking->renter_id ||
+                $user->id === $booking->terrain->owner_id) &&
+               in_array($booking->status, ['pending', 'approved']);
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, Booking $booking): bool
     {
-        return false;
+        return $user->id === $booking->renter_id ||
+               $user->id === $booking->terrain->owner_id;
     }
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, Booking $booking): bool
     {
-        return false;
+        return $user->id === $booking->terrain->owner_id;
+    }
+
+    public function approve(User $user, Booking $booking): bool
+    {
+        return $user->id === $booking->terrain->owner_id &&
+               $booking->status === 'pending';
+    }
+
+    public function reject(User $user, Booking $booking): bool
+    {
+        return $user->id === $booking->terrain->owner_id &&
+               $booking->status === 'pending';
+    }
+
+    public function complete(User $user, Booking $booking): bool
+    {
+        return $user->id === $booking->terrain->owner_id &&
+               $booking->status === 'approved';
     }
 }

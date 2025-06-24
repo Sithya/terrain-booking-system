@@ -2,16 +2,25 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Booking;
+use App\Models\Terrain;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class BookingSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        //
+        $terrains = Terrain::all();
+        $users = User::all();
+
+        foreach ($terrains as $terrain) {
+            // Create 1-3 bookings per terrain
+            Booking::factory(rand(1, 3))->create([
+                'terrain_id' => $terrain->id,
+                'renter_id' => $users->where('id', '!=', $terrain->owner_id)->random()->id,
+            ]);
+        }
     }
 }
+

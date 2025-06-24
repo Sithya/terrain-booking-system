@@ -2,63 +2,80 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreTerrainImageRequest;
+use App\Http\Requests\UpdateTerrainImageRequest;
+use App\Models\Terrain;
+use App\Models\TerrainImage;
+use Illuminate\Support\Facades\Storage;
 
 class TerrainImageController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function __construct()
     {
-        //
+        $this->middleware('auth');
+        $this->authorizeResource(TerrainImage::class, 'terrain_image');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function index(Terrain $terrain)
     {
-        //
+        $this->authorize('view', $terrain);
+        $images = $terrain->images()->latest('uploaded_at')->get();
+
+        return view('terrain-images.index', compact('terrain', 'images'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function create(Terrain $terrain)
     {
-        //
+        $this->authorize('update', $terrain);
+        return view('terrain-images.create', compact('terrain'));
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function store(StoreTerrainImageRequest $request, Terrain $terrain)
     {
-        //
+        $imagePath = $request->file('image')->store('terrain-images', 'public');
+
+        $terrain->images()->create([
+            'image_path' => $imagePath,
+            'uploaded_at' => now(),
+        ]);
+
+        return redirect()->route('terrain-images.index', $terrain)
+            ->with('success', 'Image uploaded successfully.');
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function show(TerrainImage $terrainImage)
     {
-        //
+        return view('terrain-images.show', compact('terrainImage'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function edit(TerrainImage $terrainImage)
     {
-        //
+        return view('terrain-images.edit', compact('terrainImage'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function update(UpdateTerrainImageRequest $request, TerrainImage $terrainImage)
     {
-        //
+        if ($request->hasFile('image')) {
+            Storage::disk('public')->delete($terrainImage->image_path);
+            $imagePath = $request->file('image')->store('terrain-images', 'public');
+
+            $terrainImage->update([
+                'image_path' => $imagePath,
+                'uploaded_at' => now(),
+            ]);
+        }
+
+        return redirect()->route('terrain-images.index', $terrainImage->terrain)
+            ->with('success', 'Image updated successfully.');
+    }
+
+    public function destroy(TerrainImage $terrainImage)
+    {
+        $terrain = $terrainImage->terrain;
+        Storage::disk('public')->delete($terrainImage->image_path);
+        $terrainImage->delete();
+
+        return redirect()->route('terrain-images.index', $terrain)
+            ->with('success', 'Image deleted successfully.');
     }
 }

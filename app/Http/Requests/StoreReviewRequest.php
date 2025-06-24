@@ -6,23 +6,28 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreReviewRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return false;
+        return auth()->check();
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            //
+            'terrain_id' => 'required|exists:terrains,id',
+            'rating' => 'required|integer|between:1,5',
+            'comment' => 'nullable|string|max:1000',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'terrain_id.required' => 'Terrain selection is required.',
+            'terrain_id.exists' => 'Selected terrain does not exist.',
+            'rating.required' => 'Rating is required.',
+            'rating.between' => 'Rating must be between 1 and 5.',
+            'comment.max' => 'Comment cannot exceed 1000 characters.',
         ];
     }
 }

@@ -6,23 +6,16 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateFavoriteRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return false;
+        return auth()->check() && $this->favorite->user_id === auth()->id();
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            //
+            // Favorites typically don't have updatable fields
+            // This could be used for future enhancements like favorite categories
         ];
     }
 }

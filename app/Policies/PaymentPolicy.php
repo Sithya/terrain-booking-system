@@ -2,65 +2,64 @@
 
 namespace App\Policies;
 
+use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class PaymentPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
     public function viewAny(User $user): bool
     {
-        return false;
+        return true;
     }
 
-    /**
-     * Determine whether the user can view the model.
-     */
     public function view(User $user, Payment $payment): bool
     {
-        return false;
+        return $user->id === $payment->booking->renter_id ||
+               $user->id === $payment->booking->terrain->owner_id;
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
-    public function create(User $user): bool
+    public function create(User $user, Booking $booking = null): bool
     {
-        return false;
+        if (!$booking) {
+            return false;
+        }
+
+        // Only the renter can create payments for their bookings
+        return $user->id === $booking->renter_id &&
+               in_array($booking->status, ['pending', 'approved']);
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, Payment $payment): bool
     {
-        return false;
+        // Renter can update their own payments
+        if ($user->id === $payment->booking->renter_id) {
+            return true;
+        }
+
+        // Terrain owner can update payment status (for refunds, etc.)
+        return $user->id === $payment->booking->terrain->owner_id;
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, Payment $payment): bool
     {
-        return false;
+        return $user->id === $payment->booking->renter_id ||
+               $user->id === $payment->booking->terrain->owner_id;
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, Payment $payment): bool
     {
-        return false;
+        return $user->id === $payment->booking->terrain->owner_id;
     }
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, Payment $payment): bool
     {
-        return false;
+        return $user->id === $payment->booking->terrain->owner_id;
+    }
+
+    public function refund(User $user, Payment $payment): bool
+    {
+        return $user->id === $payment->booking->terrain->owner_id &&
+               $payment->status === 'paid';
     }
 }

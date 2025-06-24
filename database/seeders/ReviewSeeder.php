@@ -2,16 +2,25 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Booking;
+use App\Models\Review;
 use Illuminate\Database\Seeder;
 
 class ReviewSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        //
+        $completedBookings = Booking::where('status', 'completed')->get();
+
+        foreach ($completedBookings as $booking) {
+            // 70% chance of having a review for completed bookings
+            if (rand(1, 100) <= 70) {
+                Review::factory()->create([
+                    'terrain_id' => $booking->terrain_id,
+                    'user_id' => $booking->renter_id,
+                ]);
+            }
+        }
     }
 }
+

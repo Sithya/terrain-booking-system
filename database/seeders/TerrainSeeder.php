@@ -2,16 +2,20 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Terrain;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class TerrainSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        //
+        // Create some users first
+        $users = User::factory(10)->create();
+
+        // Create terrains with existing users as owners
+        Terrain::factory(50)->create([
+            'owner_id' => fn() => $users->random()->id,
+        ]);
     }
 }

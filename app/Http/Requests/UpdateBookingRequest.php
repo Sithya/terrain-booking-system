@@ -6,23 +6,21 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateBookingRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return false;
+        return auth()->check() && (
+            $this->booking->renter_id === auth()->id() ||
+            $this->booking->terrain->owner_id === auth()->id()
+        );
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            //
+            'start_date' => 'sometimes|required|date',
+            'end_date' => 'sometimes|required|date|after:start_date',
+            'status' => 'sometimes|required|in:pending,approved,rejected,cancelled,completed',
         ];
     }
 }
+

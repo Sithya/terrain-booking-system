@@ -6,23 +6,19 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePaymentRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return false;
+        return auth()->check() && (
+            $this->payment->booking->renter_id === auth()->id() ||
+            $this->payment->booking->terrain->owner_id === auth()->id()
+        );
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            //
+            'status' => 'sometimes|required|in:paid,failed,refunded',
+            'transaction_id' => 'nullable|string|max:255',
         ];
     }
 }
